@@ -2,9 +2,7 @@
 
 Dự án này là hệ thống web hoàn chỉnh do mình xây dựng nhằm tìm hiểu sâu về kiến trúc triển khai dịch vụ web trong thực tế: từ việc đóng gói bằng Docker Compose, cấu hình Nginx làm Reverse Proxy chạy nhiều domain, xây dựng backend API bằng Node-RED, lưu trữ CSDL với MariaDB cho đến giải pháp đưa website ra ngoài Internet bằng Cloudflare Tunnel.
 
-* **Người thực hiện:** Nguyễn Thị Ngọc Linh (MSSV: K235480106043)
-* **Lớp:** K59KMT.K01 (K59KTP.K01)
-* **Môn học:** Phát triển ứng dụng Web - GV hướng dẫn: Thầy Đỗ Duy Cợp
+* **Người thực hiện:** Nguyễn Thị Ngọc Linh 
 
 ---
 
