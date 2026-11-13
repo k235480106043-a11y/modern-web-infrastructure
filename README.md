@@ -1,169 +1,149 @@
-# Enterprise Web Infrastructure & Microservices Architecture Showcase
-### Hệ Thống Hạ Tầng & Kiến Trúc Dịch Vụ Web Hiện Đại
+# Hạ Tầng Web & Hệ Thống Dịch Vụ Với Docker, Nginx, Node-RED
 
-[![Docker Compose](https://img.shields.io/badge/Docker_Compose-v2.24+-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
-[![Nginx](https://img.shields.io/badge/Nginx-Reverse_Proxy-009639?style=for-the-badge&logo=nginx&logoColor=white)](https://nginx.org/)
-[![Node-RED](https://img.shields.io/badge/Node--RED-Microservices_API-8F0000?style=for-the-badge&logo=nodered&logoColor=white)](https://nodered.org/)
-[![MariaDB](https://img.shields.io/badge/MariaDB-11.x-003545?style=for-the-badge&logo=mariadb&logoColor=white)](https://mariadb.org/)
-[![Cloudflare Tunnel](https://img.shields.io/badge/Cloudflare-Zero_Trust_Tunnel-F38020?style=for-the-badge&logo=cloudflare&logoColor=white)](https://www.cloudflare.com/)
+Dự án này là hệ thống web hoàn chỉnh do mình xây dựng nhằm tìm hiểu sâu về kiến trúc triển khai dịch vụ web trong thực tế: từ việc đóng gói bằng Docker Compose, cấu hình Nginx làm Reverse Proxy chạy nhiều domain, xây dựng backend API bằng Node-RED, lưu trữ CSDL với MariaDB cho đến giải pháp đưa website ra ngoài Internet bằng Cloudflare Tunnel.
 
----
-
-## 📌 1. Tổng Quan Dự Án (Executive Summary)
-
-Dự án này là giải pháp kỹ thuật toàn diện về **Hạ tầng và Kiến trúc Dịch vụ Web Doanh nghiệp (Enterprise Web Infrastructure & Services)**, được nghiên cứu và hiện thực hóa trong khuôn khổ học phần **Phát triển ứng dụng Web**. 
-
-Hệ thống được thiết kế theo tư duy kiến trúc hướng dịch vụ (**Service-Oriented Architecture - SOA**) và vùng chứa (**Containerization**), loại bỏ các rào cản truyền thống của máy chủ vật lý để mang lại khả năng triển khai tức thời, khả năng mở rộng linh hoạt, bảo mật đa tầng và tối ưu hóa tài nguyên.
-
-* **Sinh viên thực hiện:** Nguyễn Thị Ngọc Linh
-* **Mã sinh viên:** K235480106043
-* **Lớp:** K59KMT.K01 (K59KTP.K01) - Khoa Công nghệ Thông tin
-* **Giảng viên hướng dẫn:** Thầy Đỗ Duy Cợp (`duycop`)
+* **Người thực hiện:** Nguyễn Thị Ngọc Linh (MSSV: K235480106043)
+* **Lớp:** K59KMT.K01 (K59KTP.K01)
+* **Môn học:** Phát triển ứng dụng Web - GV hướng dẫn: Thầy Đỗ Duy Cợp
 
 ---
 
-## 🏗️ 2. Sơ Đồ Kiến Trúc Hệ Thống (System Architecture)
+## 1. Mục tiêu và bài toán giải quyết
 
-Toàn bộ hệ thống giao tiếp qua mạng nội bộ ảo độc lập (`app_network`), đứng sau cơ chế bảo vệ kép của **Cloudflare Edge** và **Nginx Reverse Proxy Gateway**:
+Khi mới làm web, mình thường chạy trực tiếp mọi thứ trên máy: cài Node.js, cài Apache/IIS, cài MySQL... Cách này rất dễ gây xung đột cổng mạng, khó quản lý và khi chuyển sang máy khác chạy thì lỗi tùm lum.
+
+Để giải quyết vấn đề đó, trong dự án này mình chuyển sang cách làm chuyên nghiệp hơn:
+1. **Dùng Docker Compose** gom toàn bộ 5 dịch vụ (`nginx`, `nodered`, `mariadb`, `phpmyadmin`, `cloudflared`) vào một mạng nội bộ (`app_network`). Muốn chạy chỉ cần gõ đúng một lệnh.
+2. **Dùng Nginx làm cổng đón khách (Reverse Proxy):**
+   - Chạy đồng thời 2 website với 2 tên miền khác nhau trên cùng 1 địa chỉ IP duy nhất (Virtual Host).
+   - Chuyển tiếp các yêu cầu `/api/` ngầm về Node-RED để trang web gọi API mà **không bao giờ bị lỗi CORS**.
+3. **Xây dựng API trên Node-RED:**
+   - Cung cấp dữ liệu sinh viên kèm số tiền để frontend hiển thị, tìm kiếm và tính tổng tiền tự động.
+   - Xây dựng cơ chế đăng nhập xác thực qua HTTP Cookie, bảo vệ trang dữ liệu mật nếu chưa đăng nhập.
+4. **Cơ sở dữ liệu tự động:** Khởi tạo sẵn bảng và dữ liệu mẫu trong MariaDB ngay khi bật container.
+5. **Đưa web lên Internet:** Dùng Cloudflare Tunnel để truy cập từ ngoài mạng qua tên miền riêng mà không cần mở port modem hay mua IP tĩnh.
+
+---
+
+## 2. Kiến trúc hoạt động của hệ thống
+
+Sơ đồ kết nối giữa các thành phần:
 
 ```mermaid
 flowchart TD
-    subgraph Internet ["🌐 Không Gian Mạng (Public Internet)"]
-        UserBrowser["💻 Người Dùng (Client Browser)"]
-        AdminUser["🔑 Quản Trị Viên (Admin)"]
-    end
+    Client["🌐 Người Dùng (Trình duyệt)"]
+    Cloudflare["🛡️ Cloudflare Tunnel (HTTPS)"]
+    Nginx["🚪 Nginx (Port 80) - Reverse Proxy Gateway"]
+    
+    Web1["📁 Website 1: Portal & Dashboard\n(ngoclinh1.tnut.cuong.id.vn)"]
+    Web2["📁 Website 2: Trang Giới Thiệu\n(ngoclinh2.tnut.cuong.id.vn)"]
+    NodeRed["⚡ Node-RED (Port 1880)\nBackend API: /api/tacke, /api/login, /api/mat"]
+    MariaDB[("🐬 MariaDB (Port 3306)\nCSDL: my_app")]
+    PMA["📊 phpMyAdmin (Port 8081)\nQuản trị Database"]
 
-    subgraph CloudflareEdge ["🛡️ Lớp Bảo Mật Vành Đai Cloudflare"]
-        CF_DNS["Cloudflare DNS & WAF (DDoS Mitigation)"]
-        CF_Tunnel["Cloudflare Zero-Trust Tunnel Client"]
-    end
+    Client -->|Truy cập domain| Cloudflare
+    Cloudflare -->|Chuyển tiếp HTTP| Nginx
 
-    subgraph HostServer ["🖥️ Máy Chủ Ứng Dụng (Docker Compose Network: app_network)"]
-        NginxGateway["🚪 Nginx Reverse Proxy (Port 80)\n[Gateway & Virtual Host Dispatcher]"]
-        
-        subgraph StaticWebsites ["📁 Khối Giao Diện Web (Frontend Static)"]
-            Web1["🌐 Website 1 (Portal & Dashboard)\nngoclinh1.tnut.cuong.id.vn"]
-            Web2["🌐 Website 2 (Company Landing)\nngoclinh2.tnut.cuong.id.vn"]
-        end
+    Nginx -->|Domain ngoclinh1.*| Web1
+    Nginx -->|Domain ngoclinh2.*| Web2
+    Nginx -->|Đường dẫn /api/*| NodeRed
 
-        subgraph BackendServices ["⚡ Khối Dịch Vụ Microservices (Backend)"]
-            NodeRed["🟢 Node-RED Engine (Port 1880)\n- REST API: /api/tacke\n- Auth API: /api/login\n- Secure API: /api/mat"]
-        end
-
-        subgraph DatabaseTier ["💾 Khối Cơ Sở Dữ Liệu (Persistence Layer)"]
-            MariaDB["🐬 MariaDB Server (Port 3306)\n- Database: my_app\n- Tables: SinhVien, Users, Cookies, Diem"]
-            PhpMyAdmin["📊 phpMyAdmin Interface (Port 8081)"]
-        end
-    end
-
-    UserBrowser -->|Truy cập Domain| CF_DNS
-    AdminUser -->|Quản trị| CF_DNS
-    CF_DNS <==>|Encrypted Tunnel| CF_Tunnel
-    CF_Tunnel -->|Forward HTTP| NginxGateway
-
-    NginxGateway -->|Host: ngoclinh1.*| Web1
-    NginxGateway -->|Host: ngoclinh2.*| Web2
-    NginxGateway -->|Route: /api/* (Proxy Pass)| NodeRed
-
-    NodeRed <-->|Query SQL / Connection Pool| MariaDB
-    PhpMyAdmin <-->|SQL Management| MariaDB
+    NodeRed <-->|Truy vấn dữ liệu| MariaDB
+    PMA <-->|Quản trị CSDL| MariaDB
 ```
 
 ---
 
-## ⚙️ 3. Phân Tích Kỹ Thuật 5 Dịch Vụ Cốt Lõi
+## 3. Cấu trúc thư mục dự án
 
-### 3.1. Reverse Proxy & Virtual Hosting (Nginx Gateway)
-* **Định tuyến đa tên miền (Multi-Tenancy):** Cấu hình Nginx sử dụng cơ chế Virtual Host nhận diện trường `Host` trong HTTP Header để phục vụ đồng thời 2 website riêng biệt trên cùng một địa chỉ IP và Port 80 duy nhất:
-  - `ngoclinh1.tnut.cuong.id.vn`: Cổng thông tin điều hành chính (Portal & API consumer).
-  - `ngoclinh2.tnut.cuong.id.vn`: Trang giới thiệu doanh nghiệp độc lập (Resource isolation).
-* **Triệt tiêu lỗi CORS (Cross-Origin Resource Sharing):** Nginx đóng vai trò trung chuyển ngược: mọi yêu cầu bắt đầu bằng `/api/` được chuyển hướng ngầm tới `http://nodered:1880/api/`. Mã JavaScript tại Frontend chỉ cần gọi URL tương đối (`fetch('/api/tacke')`) mà không bị rào cản Same-Origin Policy của trình duyệt.
-
-### 3.2. Low-Code Microservices API (Node-RED)
-* Kiến trúc xử lý luồng sự kiện non-blocking tối ưu hóa hiệu năng I/O.
-* **Các Endpoint chính:**
-  - `GET /api/tacke`: Cung cấp danh sách sinh viên kèm số tiền theo thời gian thực dưới định dạng JSON chuẩn.
-  - `POST /api/login`: Tiếp nhận thông tin định danh, xác thực và cấp phát Session Cookie token.
-  - `POST /api/check_logined`: Xác thực tính hợp lệ của phiên làm việc.
-  - `POST /api/mat`: Trả về dữ liệu điểm thi và hồ sơ cá nhân bảo mật chỉ khi kiểm tra Token thành công.
-
-### 3.3. Cơ Sở Dữ Liệu Quan Hệ & Khởi Tạo Tự Động (MariaDB)
-* Lưu trữ an toàn các bảng thực thể: `SinhVien`, `Users`, `Cookies`, `Diem`.
-* **Cơ chế DDL Auto-Provisioning:** Ánh xạ tệp `./mariadb/init.sql` vào `/docker-entrypoint-initdb.d/init.sql` của Container MariaDB. Khi máy chủ khởi động lần đầu, toàn bộ cấu trúc bảng và dữ liệu mẫu được nạp tự động, loại bỏ 100% thao tác thủ công.
-
-### 3.4. Quản Trị CSDL Trực Quan (phpMyAdmin)
-* Độc lập, giao tiếp trực tiếp với container MariaDB qua cổng `8081`. Cho phép quan sát, sao lưu và kiểm tra tính toàn vẹn dữ liệu.
-
-### 3.5. Đường Hầm Bảo Mật Zero-Trust (Cloudflare Tunnel)
-* **Bảo vệ toàn diện:** Máy chủ không cần mở bất kỳ cổng nào trên modem/router (No Port Forwarding), không yêu cầu địa chỉ IP tĩnh công cộng đắt đỏ.
-* Mọi lưu lượng từ Internet được bọc mã hóa TLS/HTTPS qua đường hầm ra ngoài và được bảo vệ trước các đòn tấn công từ chối dịch vụ (DDoS) tại Cloudflare Edge.
+```text
+modern-web-infrastructure/
+├── docker-compose.yml       # Tệp điều phối 5 dịch vụ
+├── .env.example             # Tệp mẫu lưu biến môi trường (token, mật khẩu)
+├── .gitignore               # Bỏ qua các file rác và file tạm
+├── nginx/
+│   └── nginx.conf           # Cấu hình 2 virtual host và reverse proxy /api/
+├── nodered/
+│   └── flows.json           # Toàn bộ luồng API xây dựng trên Node-RED
+├── mariadb/
+│   └── init.sql             # Script tự động tạo bảng và nạp dữ liệu mẫu
+├── html/                    # Thư mục chứa mã nguồn các website
+│   ├── web1/                # Website 1: Giao diện gọi API + Đăng nhập Cookie
+│   │   ├── index.html
+│   │   └── app.js
+│   └── web2/                # Website 2: Trang web độc lập chứng minh đa tên miền
+│       └── index.html
+└── README.md                # Báo cáo kỹ thuật chi tiết
+```
 
 ---
 
-## 🔐 4. Cơ Chế Xác Thực & Duy Trì Phiên (State & Session Management)
+## 4. Chi tiết các phần mình đã làm
 
-Hệ thống triển khai cơ chế xác thực **Token-Based Session** thông qua HTTP Cookie:
+### 4.1. Cấu hình Nginx đa tên miền và chống lỗi CORS
+Trong file `nginx/nginx.conf`, mình chia làm 2 khối `server`:
+* **Website 1:** Lắng nghe domain `ngoclinh1.tnut.cuong.id.vn` và `localhost`, trỏ thư mục gốc về `/usr/share/nginx/html/web1`.
+* **Website 2:** Lắng nghe domain `ngoclinh2.tnut.cuong.id.vn` và `web2.localhost`, trỏ về `/usr/share/nginx/html/web2`.
+* **Chuyển tiếp API:** Cả 2 site đều có đoạn:
+  ```nginx
+  location /api/ {
+      proxy_pass http://nodered:1880/api/;
+      proxy_set_header Host $host;
+      proxy_set_header X-Real-IP $remote_addr;
+  }
+  ```
+  Nhờ đó trên file `app.js`, mình chỉ cần gõ lệnh `fetch('/api/tacke')` là trình duyệt tự hiểu và gửi qua Nginx, không bị trình duyệt chặn vì khác domain hay khác cổng (CORS).
 
-1. **Client Submission:** Người dùng gửi `uid` và `pwd` qua phương thức `POST` tới `/api/login`.
-2. **Server Validation & Token Generation:** Backend Node-RED đối soát thông tin; nếu hợp lệ sẽ tạo một chuỗi mã định danh duy nhất (UUID/Token) với tiền tố `session_` kết hợp timestamp.
-3. **Cookie Storage:** Trình duyệt nhận mã và lưu trữ dưới dạng Cookie an toàn (`SameSite=Lax`, thời hạn 7 ngày).
-4. **Protected Resource Access:** Khi truy cập trang mật (`/api/mat`), mã Cookie được tự động đính kèm để thẩm định quyền trước khi xuất dữ liệu.
+### 4.2. Xây dựng API và Xác thực Cookie trên Node-RED
+Trong `nodered/flows.json`, mình thiết kế 4 endpoint:
+* `GET /api/tacke`: Trả về danh sách sinh viên kèm tiền. Bên giao diện `web1` có thêm ô tìm kiếm để lọc danh sách theo tên và tự cộng dồn tổng số tiền.
+* `POST /api/login`: Nhận `uid` và `pwd`. Nếu đúng thông tin, Node-RED trả về chuỗi mã `session_...`. Phía JavaScript sẽ lưu mã này vào Cookie trình duyệt (thời hạn 7 ngày).
+* `POST /api/check_logined`: Mỗi lần mở lại web, JS tự gửi Cookie lên kiểm tra, nếu hợp lệ sẽ tự động hiển thị trạng thái đã đăng nhập mà không cần gõ lại tài khoản.
+* `POST /api/mat`: Chỉ khi nào gửi kèm Cookie hợp lệ thì server mới trả về bảng điểm cá nhân; nếu không đăng nhập thì sẽ bị từ chối.
+
+### 4.3. Tự động hóa cơ sở dữ liệu với MariaDB
+Thay vì phải vào phpMyAdmin tạo bảng thủ công, mình tạo file `mariadb/init.sql` và mount vào `/docker-entrypoint-initdb.d/init.sql` trong `docker-compose.yml`.
+Lần đầu tiên container MariaDB khởi động, nó sẽ tự động chạy file này để:
+* Tạo bảng `SinhVien` và chèn sẵn 5 sinh viên mẫu.
+* Tạo bảng `Users` có tài khoản `ngoclinh`, `admin`, `duycop`.
+* Tạo bảng `Cookies` và bảng `Diem`.
+
+### 4.4. Đưa web ra ngoài với Cloudflare Tunnel
+Trong `docker-compose.yml`, dịch vụ `cloudflared` kết nối thẳng với Cloudflare qua token. Nhờ đó, người ngoài có thể truy cập website qua domain chính thức mà máy chủ của mình không cần mở bất kỳ cổng nào trên modem, vừa tiện vừa an toàn.
 
 ---
 
-## 🛠️ 5. Post-Mortem: Phân Tích Sự Cố Kỹ Thuật & Bài Học Kinh Nghiệm
+## 5. Sự cố thực tế từng gặp và cách mình sửa
 
-Trong quá trình phát triển phiên bản ban đầu (v1.0), hệ thống gặp sự cố đường dẫn khi ánh xạ thư mục trong Nginx:
+Trong phiên bản bài làm trước đây, mình từng gặp lỗi **Nginx báo 404 Not Found** dù container vẫn chạy. 
 
-| Hạng mục | Phiên bản v1.0 (Lỗi sự cố) | Phiên bản v2.0 (Chuẩn Kỹ Sư Hiện Tại) |
-| :--- | :--- | :--- |
-| **Cấu trúc Host** | `web1/` và `web2/` nằm ngang hàng `docker-compose.yml` | Gom toàn bộ website vào thư mục cha `html/` (`html/web1/`, `html/web2/`) |
-| **Mount Volume** | `- ./html:/usr/share/nginx/html` *(lệch cấu trúc)* | `- ./html:/usr/share/nginx/html:ro` |
-| **Nginx Root Path**| `root /usr/share/nginx/html/web1;` | `root /usr/share/nginx/html/web1;` *(Khớp 100%)* |
-| **Hiện tượng** | Container Nginx báo **404 Not Found** khi khởi chạy | **Hệ thống chạy mượt mà ngay sau 1 lệnh khởi động** |
-
-> **💡 Bài học cốt lõi:** Khi làm việc với Docker Volume, việc quy hoạch thư mục gốc (Parent Directory Mounting) đồng bộ tuyệt đối giữa Host OS và Container Filesystem là nguyên tắc sống còn để tránh lỗi Path Traversal.
+* **Nguyên nhân:** Mình để thư mục `web1` và `web2` nằm ở ngoài thư mục gốc, nhưng trong `docker-compose.yml` lại khai báo mount `- ./html:/usr/share/nginx/html`. Khi đó Docker tạo ra một thư mục `html` rỗng và đè lên container, khiến Nginx tìm vào `/usr/share/nginx/html/web1` nhưng không thấy file nào.
+* **Cách khắc phục ở bản này:** Mình tạo thư mục cha `html/` và đưa cả `web1/`, `web2/` vào bên trong. Cấu trúc thư mục trên máy thật lúc này khớp 100% với đường dẫn bên trong container Nginx, sửa dứt điểm lỗi 404.
 
 ---
 
-## 🚀 6. Hướng Dẫn Triển Khai Nhanh (Quick Start)
+## 6. Hướng dẫn chạy thử dự án
 
-### Yêu cầu tiên quyết
-* Máy tính đã cài đặt **Docker Desktop** (trên Windows/macOS) hoặc **Docker Engine & Docker Compose** (trên Ubuntu/WSL).
-* Git CLI.
-
-### 3 Bước khởi chạy hệ thống:
-
+### Bước 1: Tải mã nguồn về máy
 ```bash
-# 1. Sao chép mã nguồn dự án
 git clone https://github.com/k235480106043-a11y/modern-web-infrastructure.git
 cd modern-web-infrastructure
-
-# 2. Khởi chạy toàn bộ 5 dịch vụ ngầm bằng Docker Compose
-docker compose up -d
-
-# 3. Kiểm tra trạng thái các container đang chạy
-docker compose ps
 ```
 
-### Các cổng dịch vụ cục bộ:
-* **Website 1 (Cổng thông tin & API):** [http://localhost](http://localhost)
-* **Website 2 (Trang độc lập Virtual Host):** [http://web2.localhost](http://web2.localhost)
-* **Backend Node-RED Flow Editor:** [http://localhost:1880](http://localhost:1880)
-* **Quản trị CSDL phpMyAdmin:** [http://localhost:8081](http://localhost:8081)
+### Bước 2: Khởi chạy bằng Docker Compose
+```bash
+docker compose up -d
+```
 
----
+### Bước 3: Kiểm tra trên trình duyệt
+* **Website 1 (Trang chính & API):** [http://localhost](http://localhost)
+  * Bấm nút **"Lấy Dữ Liệu API"** để tải danh sách và thử tìm kiếm theo tên.
+  * Thử đăng nhập bằng tài khoản: `ngoclinh` | Mật khẩu: `123456` để kiểm tra lưu Cookie và xem bảng điểm mật.
+* **Website 2 (Virtual Host thứ 2):** [http://web2.localhost](http://web2.localhost)
+* **Quản trị Database phpMyAdmin:** [http://localhost:8081](http://localhost:8081) *(User: `root`, Password: `rootpassword`)*
+* **Giao diện Node-RED:** [http://localhost:1880](http://localhost:1880)
 
-## 📊 7. So Sánh Kiến Trúc Truyền Thống vs Kiến Trúc Hiện Đại
-
-| Tiêu chí | Ngăn xếp truyền thống (IIS + ASP.NET + SQL Server) | Ngăn xếp hiện đại (Docker + Nginx + Node-RED + MariaDB) |
-| :--- | :--- | :--- |
-| **Môi trường** | Phụ thuộc chặt chẽ vào Windows OS và IIS runtime | Chạy độc lập, nhất quán trên mọi hệ điều hành qua Container |
-| **Khả năng mở rộng**| Khó co giãn, cấu hình phức tạp | Co giãn tức thì với `docker compose up --scale` |
-| **Triển khai** | Cài đặt thủ công từng cấu phần | Đóng gói toàn bộ hạ tầng thành mã nguồn (**IaC**) |
-| **Bảo mật mạng** | Cần mở cổng NAT/Router dễ bị tấn công | Zero-Trust Tunnel không mở cổng, ẩn IP máy chủ |
-
----
-
-## 📜 8. Bản Quyền & Giấy Phép
-Dự án được thực hiện bởi sinh viên **Nguyễn Thị Ngọc Linh** cho đồ án học phần **Phát triển ứng dụng Web**. Toàn bộ mã nguồn mở phục vụ mục đích học thuật, nghiên cứu và trình diễn năng lực kỹ thuật.
+Khi muốn dừng toàn bộ hệ thống:
+```bash
+docker compose down
+```
