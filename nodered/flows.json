@@ -1,0 +1,205 @@
+[
+    {
+        "id": "tab_main_api",
+        "type": "tab",
+        "label": "Enterprise API Gateway",
+        "disabled": false,
+        "info": "Hệ thống API Microservices: /api/tacke, /api/login, /api/check_logined, /api/mat"
+    },
+    {
+        "id": "node_http_in_tacke",
+        "type": "http in",
+        "z": "tab_main_api",
+        "name": "GET /api/tacke",
+        "url": "/api/tacke",
+        "method": "get",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 160,
+        "y": 120,
+        "wires": [
+            [
+                "func_process_tacke"
+            ]
+        ]
+    },
+    {
+        "id": "func_process_tacke",
+        "type": "function",
+        "z": "tab_main_api",
+        "name": "Xử lý danh sách sinh viên",
+        "func": "msg.payload = {\n    \"ok\": 1,\n    \"msg\": \"Truy vấn API thành công!\",\n    \"system\": \"Enterprise Web Infrastructure - K59KMT\",\n    \"author\": \"Nguyễn Thị Ngọc Linh\",\n    \"timestamp\": new Date().toISOString(),\n    \"dssv\": [\n        {\"name\": \"Nguyễn Thị Ngọc Linh\", \"money\": 999},\n        {\"name\": \"Thầy Đỗ Duy Cợp\", \"money\": 123},\n        {\"name\": \"David\", \"money\": 456},\n        {\"name\": \"Minh Anh\", \"money\": 650},\n        {\"name\": \"Hoàng Nam\", \"money\": 820}\n    ]\n};\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 420,
+        "y": 120,
+        "wires": [
+            [
+                "node_http_res_tacke"
+            ]
+        ]
+    },
+    {
+        "id": "node_http_res_tacke",
+        "type": "http response",
+        "z": "tab_main_api",
+        "name": "Response JSON",
+        "statusCode": "200",
+        "headers": {
+            "content-type": "application/json; charset=utf-8"
+        },
+        "x": 700,
+        "y": 120,
+        "wires": []
+    },
+    {
+        "id": "node_http_in_login",
+        "type": "http in",
+        "z": "tab_main_api",
+        "name": "POST /api/login",
+        "url": "/api/login",
+        "method": "post",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 160,
+        "y": 240,
+        "wires": [
+            [
+                "func_auth_login"
+            ]
+        ]
+    },
+    {
+        "id": "func_auth_login",
+        "type": "function",
+        "z": "tab_main_api",
+        "name": "Xác thực tài khoản & Cấp Cookie",
+        "func": "const uid = (msg.payload.uid || '').trim().toLowerCase();\nconst pwd = (msg.payload.pwd || '').trim();\n\nconst validUsers = {\n    'ngoclinh': { pwd: '123456', name: 'Nguyễn Thị Ngọc Linh' },\n    'admin': { pwd: '123456', name: 'Quản trị viên Hệ thống' },\n    'duycop': { pwd: '123456', name: 'Thầy Đỗ Duy Cợp' }\n};\n\nif (validUsers[uid] && validUsers[uid].pwd === pwd) {\n    const generatedCk = 'session_' + Math.random().toString(36).substring(2) + Date.now();\n    msg.payload = {\n        ok: 1,\n        msg: 'Đăng nhập thành công!',\n        uid: uid,\n        fullname: validUsers[uid].name,\n        ck: generatedCk\n    };\n} else {\n    msg.payload = {\n        ok: 0,\n        msg: 'Sai tài khoản hoặc mật khẩu! Vui lòng thử lại.'\n    };\n}\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 430,
+        "y": 240,
+        "wires": [
+            [
+                "node_http_res_login"
+            ]
+        ]
+    },
+    {
+        "id": "node_http_res_login",
+        "type": "http response",
+        "z": "tab_main_api",
+        "name": "Response Login",
+        "statusCode": "200",
+        "headers": {
+            "content-type": "application/json; charset=utf-8"
+        },
+        "x": 710,
+        "y": 240,
+        "wires": []
+    },
+    {
+        "id": "node_http_in_check_logined",
+        "type": "http in",
+        "z": "tab_main_api",
+        "name": "POST /api/check_logined",
+        "url": "/api/check_logined",
+        "method": "post",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 190,
+        "y": 360,
+        "wires": [
+            [
+                "func_check_token"
+            ]
+        ]
+    },
+    {
+        "id": "func_check_token",
+        "type": "function",
+        "z": "tab_main_api",
+        "name": "Kiểm tra phiên Session Cookie",
+        "func": "const ck = msg.payload.ck;\nif (ck && typeof ck === 'string' && ck.startsWith('session_')) {\n    msg.payload = { ok: 1, msg: 'Phiên đăng nhập hợp lệ!' };\n} else {\n    msg.payload = { ok: 0, msg: 'Phiên làm việc hết hạn hoặc không tồn tại.' };\n}\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 450,
+        "y": 360,
+        "wires": [
+            [
+                "node_http_res_check"
+            ]
+        ]
+    },
+    {
+        "id": "node_http_res_check",
+        "type": "http response",
+        "z": "tab_main_api",
+        "name": "Response Check",
+        "statusCode": "200",
+        "headers": {
+            "content-type": "application/json; charset=utf-8"
+        },
+        "x": 710,
+        "y": 360,
+        "wires": []
+    },
+    {
+        "id": "node_http_in_mat",
+        "type": "http in",
+        "z": "tab_main_api",
+        "name": "POST /api/mat",
+        "url": "/api/mat",
+        "method": "post",
+        "upload": false,
+        "swaggerDoc": "",
+        "x": 160,
+        "y": 480,
+        "wires": [
+            [
+                "func_get_secret_data"
+            ]
+        ]
+    },
+    {
+        "id": "func_get_secret_data",
+        "type": "function",
+        "z": "tab_main_api",
+        "name": "Truy xuất dữ liệu mật",
+        "func": "const ck = msg.payload.ck;\nif (ck && typeof ck === 'string' && ck.startsWith('session_')) {\n    msg.payload = {\n        ok: 1,\n        data: [\n            { mon: 'Phát triển ứng dụng Web', diem: 10.0 },\n            { mon: 'An toàn và bảo mật thông tin', diem: 9.5 },\n            { mon: 'Kiến trúc máy tính', diem: 9.0 }\n        ]\n    };\n} else {\n    msg.payload = {\n        ok: 0,\n        msg: 'Bạn không có quyền xem thông tin mật này!'\n    };\n}\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 420,
+        "y": 480,
+        "wires": [
+            [
+                "node_http_res_mat"
+            ]
+        ]
+    },
+    {
+        "id": "node_http_res_mat",
+        "type": "http response",
+        "z": "tab_main_api",
+        "name": "Response Mat",
+        "statusCode": "200",
+        "headers": {
+            "content-type": "application/json; charset=utf-8"
+        },
+        "x": 700,
+        "y": 480,
+        "wires": []
+    }
+]

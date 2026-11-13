@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Website 2 - Virtual Host Isolation</title>
+    <!-- Bootstrap 5 CSS & FontAwesome -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <style>
+        body { background-color: #f8fafc; font-family: 'Segoe UI', system-ui, sans-serif; }
+        .hero { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: white; padding: 60px 0 40px; border-radius: 0 0 30px 30px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
+        .card-custom { border: none; border-radius: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .feature-icon { width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.4rem; margin-bottom: 15px; }
+    </style>
+</head>
+<body>
+
+    <!-- Hero Header -->
+    <div class="hero text-center mb-5">
+        <div class="container">
+            <span class="badge bg-success-subtle text-success border border-success-subtle mb-3 px-3 py-2 text-uppercase fw-bold">
+                <i class="fa-solid fa-circle-check me-1"></i>Virtual Host 2 Active
+            </span>
+            <h1 class="fw-bold mb-2">Website 2: Độc Lập & Cô Lập Tên Miền</h1>
+            <p class="lead text-light opacity-75 mb-3">Minh chứng năng lực định tuyến đa tên miền (Multi-Tenant Routing) trên nền tảng Nginx Reverse Proxy</p>
+            <div class="d-inline-flex gap-2">
+                <span class="badge bg-secondary px-3 py-2"><i class="fa-solid fa-globe me-1"></i>Domain: ngoclinh2.tnut.cuong.id.vn</span>
+                <span class="badge bg-secondary px-3 py-2"><i class="fa-solid fa-network-wired me-1"></i>Server Port: 80</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="container mb-5">
+        <div class="row g-4 justify-content-center">
+            
+            <!-- Cột thông tin hệ thống -->
+            <div class="col-lg-8">
+                <div class="card card-custom p-4 mb-4">
+                    <h4 class="fw-bold text-dark mb-3"><i class="fa-solid fa-layer-group text-primary me-2"></i>Kiến Trúc Virtual Host</h4>
+                    <p class="text-muted">
+                        Website này được phân bổ tại thư mục riêng biệt <code>/usr/share/nginx/html/web2</code> và lắng nghe tên miền 
+                        <code>ngoclinh2.tnut.cuong.id.vn</code> (hoặc <code>web2.localhost</code>). Nginx phân tách hoàn toàn mã nguồn của Website 2 
+                        với Website 1, đảm bảo tính bảo mật và độc lập cho từng dịch vụ.
+                    </p>
+
+                    <div class="row g-3 mt-1">
+                        <div class="col-md-4">
+                            <div class="p-3 border rounded-3 bg-light text-center">
+                                <div class="feature-icon bg-primary text-white mx-auto"><i class="fa-solid fa-shield-halved"></i></div>
+                                <h6 class="fw-bold mb-1">Cô Lập Tài Nguyên</h6>
+                                <small class="text-muted">Root folder độc lập, ngăn chặn rò rỉ mã nguồn chéo.</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="p-3 border rounded-3 bg-light text-center">
+                                <div class="feature-icon bg-success text-white mx-auto"><i class="fa-solid fa-bolt"></i></div>
+                                <h6 class="fw-bold mb-1">Hiệu Suất Cao</h6>
+                                <small class="text-muted">Xử lý non-blocking I/O phục vụ hàng ngàn kết nối đồng thời.</small>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="p-3 border rounded-3 bg-light text-center">
+                                <div class="feature-icon bg-warning text-white mx-auto"><i class="fa-solid fa-arrows-split-up-and-left"></i></div>
+                                <h6 class="fw-bold mb-1">Chung Gateway API</h6>
+                                <small class="text-muted">Chia sẻ chung hạ tầng Reverse Proxy kết nối Node-RED.</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Test gọi chung API -->
+                <div class="card card-custom p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="fw-bold text-dark mb-0"><i class="fa-solid fa-plug-circle-check text-success me-2"></i>Kiểm Thử Kết Nối API Từ Website 2</h5>
+                        <button class="btn btn-outline-primary btn-sm" onclick="testSharedApi()">
+                            <i class="fa-solid fa-arrows-rotate me-1"></i>Gọi /api/tacke
+                        </button>
+                    </div>
+                    <p class="small text-muted mb-2">Website 2 có thể gọi API dùng chung qua đường dẫn <code>/api/tacke</code> do Nginx định tuyến:</p>
+                    <pre id="apiOutput" class="bg-dark text-success p-3 rounded-3 small mb-0" style="max-height: 200px; overflow-y: auto;">// Bấm nút trên để kiểm tra kết nối API dùng chung...</pre>
+                </div>
+            </div>
+
+            <!-- Cột thông tin sinh viên -->
+            <div class="col-lg-4">
+                <div class="card card-custom p-4">
+                    <h5 class="fw-bold text-dark mb-3"><i class="fa-solid fa-id-card text-info me-2"></i>Thông Tin Đồ Án</h5>
+                    <ul class="list-unstyled small mb-0">
+                        <li class="mb-2"><strong>Sinh viên:</strong> Nguyễn Thị Ngọc Linh</li>
+                        <li class="mb-2"><strong>Mã sinh viên:</strong> K235480106043</li>
+                        <li class="mb-2"><strong>Lớp:</strong> K59KMT.K01 (K59KTP.K01)</li>
+                        <li class="mb-2"><strong>Môn học:</strong> Phát triển ứng dụng Web</li>
+                        <li class="mb-2"><strong>Giảng viên hướng dẫn:</strong> Thầy Đỗ Duy Cợp</li>
+                        <li class="pt-2 border-top">
+                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle">Final Project v2.0 Production</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        async function testSharedApi() {
+            const out = document.getElementById('apiOutput');
+            out.textContent = 'Đang gửi yêu cầu tới /api/tacke qua Reverse Proxy...';
+            try {
+                const res = await fetch('/api/tacke');
+                const data = await res.json();
+                out.textContent = JSON.stringify(data, null, 2);
+            } catch (err) {
+                out.textContent = 'Lỗi kết nối tới API: ' + err.message;
+            }
+        }
+    </script>
+</body>
+</html>
